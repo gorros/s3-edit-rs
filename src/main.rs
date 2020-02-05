@@ -8,10 +8,11 @@ use std::process::Command;
 use futures::{Future, Stream};
 use rusoto_core::Region;
 use rusoto_s3::{GetObjectRequest, PutObjectOutput, PutObjectRequest, S3Client, S3};
+use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io::Write;
 use std::io::Read;
+use std::io::Write;
 
 const USAGE: &'static str = "
 Edit S3 files
@@ -24,29 +25,23 @@ Options:
     -h --help   Show this screen.
 ";
 
-// enum S3EditRSError {
-//     SDKError(RusotoError),
-//     S3Error(PutObjectError),
-//     IoError(io::Error)
-// }
-
-// impl From<io::Error> for S3EditRSError {
-//     fn from(error: io::Error) -> Self {
-//         S3EditRSError::IoError(error)
-//     }
-// }
-
-// impl From<PutObjectError> for S3EditRSError {
-//     fn from(error: PutObjectError) -> Self {
-//         S3EditRSError::S3Error(error)
-//     }
-// }
-
-// impl From<RusotoError> for S3EditRSError {
-//     fn from(error: RusotoError) -> Self {
-//         S3EditRSError::SDKError(error)
-//     }
-// }
+fn donwload_filr_from_s3(
+    file_path: &Path,
+    bucket: String,
+    key: String,
+) -> Result<(), Box<dyn Error>> {
+    let s3_client = S3Client::new(Region::default());
+    let get_req = GetObjectRequest {
+        bucket: bucket.clone(),
+        key: key.clone(),
+        ..Default::default()
+    };
+    let result = s3_client.get_object(get_req).sync()?;
+    let stream = result.body.unwrap();
+    let body = stream.concat2().wait().unwrap();
+    let mut file = File::create(&file_path)?;
+    Ok(file.write_all(&body)?)
+}
 
 fn upload_file_to_s3(
     file_path: &Path,
@@ -71,7 +66,6 @@ fn main() {
     let args = Docopt::new(USAGE)
         .and_then(|dopt| dopt.parse())
         .unwrap_or_else(|e| e.exit());
-    // println!("File {}", args.get_str("<s3-path>"));
 
     let s: Vec<&str> = args
         .get_str("<s3-path>")
@@ -80,35 +74,23 @@ fn main() {
         .collect();
     let bucket = s[0].to_string();
     let key = s[1..].join("/");
-    // println!("{} {}", bucket, key);
-    let s3_client = S3Client::new(Region::default());
-    let get_req = GetObjectRequest {
-        bucket: bucket.clone(),
-        key: key.clone(),
-        ..Default::default()
-    };
 
     let file_name = s.last().unwrap().to_owned();
     let tmp_dir_path = Path::new("/tmp/.s3-edit-rs");
     create_dir_all(tmp_dir_path).expect("failed to create directory");
     let tmp_file_path = tmp_dir_path.join(Path::new(file_name));
 
-    let result = s3_client.get_object(get_req).sync().expect("error!");
-    let stream = result.body.unwrap();
-    let body = stream.concat2().wait().unwrap();
-    let mut file = File::create(&tmp_file_path).expect("create failed");
-    file.write_all(&body).expect("failed to write body");
+    donwload_filr_from_s3(&tmp_file_path, bucket.clone(), key.clone()).expect("Download failed");
 
-    let editor = "vim";
+    let editor = match env::var_os("EDITOR") {
+        Some(val) => val.into_string().unwrap_or(String::from("vi")),
+        None => String::from("vi"),
+    };
     Command::new("sh")
         .arg("-c")
         .arg(format!("{} {}", editor, tmp_file_path.to_str().unwrap()))
         .status()
         .expect("failed to open file");
 
-    // // let hello = output.stdout;
-    // println!("{}", String::from_utf8(hello).unwrap());
-    // println!("{}", tmp_dir_path.to_str().unwrap())
     upload_file_to_s3(&tmp_file_path, bucket.clone(), key.clone()).expect("Failed to edit file");
-    // Ok(())
 }
