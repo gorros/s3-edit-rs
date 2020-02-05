@@ -21,5 +21,5 @@ $ aws s3 cp test_keyboard.txt s3://mybucket/test_keyboard.txt
 To directly edit a file on S3, use edit subcommand.
 
 ```
-$ s3-edit-rd edit s3://mybucket/test_keyboard.txt
+$ s3-edit-rs edit s3://mybucket/test_keyboard.txt
 ```
