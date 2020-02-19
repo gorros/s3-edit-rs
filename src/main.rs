@@ -50,8 +50,7 @@ fn upload_file_to_s3(
 ) -> Result<PutObjectOutput, Box<dyn Error>> {
     let mut file = File::open(file_path)?;
     let mut file_data: Vec<u8> = vec![];
-    file.read_to_end(&mut file_data)
-        .expect("Failed to read file");
+    file.read_to_end(&mut file_data)?;
 
     let client = S3Client::new(Region::UsEast1);
     let mut request = PutObjectRequest::default();
