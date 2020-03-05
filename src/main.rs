@@ -25,7 +25,7 @@ Options:
     -h --help   Show this screen.
 ";
 
-fn donwload_filr_from_s3(
+fn donwload_file_from_s3(
     file_path: &Path,
     bucket: String,
     key: String,
@@ -79,7 +79,7 @@ fn main() {
     create_dir_all(tmp_dir_path).expect("failed to create directory");
     let tmp_file_path = tmp_dir_path.join(Path::new(file_name));
 
-    donwload_filr_from_s3(&tmp_file_path, bucket.clone(), key.clone()).expect("Download failed");
+    donwload_file_from_s3(&tmp_file_path, bucket.clone(), key.clone()).expect("Download failed");
 
     let editor = match env::var_os("EDITOR") {
         Some(val) => val.into_string().unwrap_or(String::from("vi")),
